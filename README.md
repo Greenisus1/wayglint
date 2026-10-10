@@ -5,17 +5,18 @@ Fullscreen terminal maps for Linux and SSH. Install and go: no API key, signup, 
 ## What it does
 
 - Explicit place search using Photon, with a five-result chooser.
-- OpenStreetMap map tiles rendered as terminal color blocks, zoom and pan.
+- OpenStreetMap map tiles rendered as a centered RGB truecolor half-block terminal viewport, zoom and pan.
+- A toggles street / US aerial imagery, M loads the selected viewport. US aerial is historic USDA/USGS imagery, not live; contiguous-US area only, gaps possible, max zoom 16. No keys or payment.
 - OSRM/FOSSGIS driving route estimates and text maneuver steps.
 - Locally saved favorite places, route link export and local response caching.
 - `--offline` uses only previously cached requests and map tiles. No network calls. Cached routes can be old.
 - `--demo` shows clearly marked generated demo art, not a real map.
 
-This is a planning/exploration app, not live navigation. No GPS tracking, live traffic, closure/weather information or safety guarantees. Route estimates can be wrong or stale. Don't operate it while driving. Map street labels lose detail in terminal rendering. The visible map is one loaded tile, not a seamless multi-tile atlas. Panning/zooming changes the desired center; M fetches that chosen tile explicitly, never prefetches.
+This is a planning/exploration app, not live navigation. No GPS tracking, live traffic, closure/weather information or safety guarantees. Route estimates can be wrong or stale. Don't operate it while driving. Map street labels lose detail in terminal rendering. The viewport stitches only the tiles it intersects (up to four), centers the selected place and preserves map aspect ratio. Default zoom 17, Lanczos downsampling and full RGB colors on compatible terminals and a separate text place panel make shapes clearer. Raster street labels still cannot be promised readable; use place search and route steps for names. Panning/zooming changes the desired center; M fetches that viewport explicitly, never prefetches.
 
 ## Controls
 
-S search; Up/Down choose and Enter select. C enter latitude,longitude. M fetch one map tile. Arrows pan desired center; +/- zoom. O marks current place as origin; select destination and R requests a driving route. Up/Down scroll steps, Esc returns to map. F saves a favorite; B lists favorites. G saves a Google Maps route link locally; `python3 wayglint.py --last-link` prints it for copying to your phone. H help. Q quits. Letter controls accept upper/lowercase. Terminal minimum: 80x23, 256 colors recommended.
+S search; Up/Down choose and Enter select. C enter latitude,longitude. M fetch map viewport. Arrows pan desired center; +/- zoom. O marks current place as origin; select destination and R requests a driving route. Up/Down scroll steps, Esc returns to map. F saves a favorite; B lists favorites. G saves a Google Maps route link locally; `python3 wayglint.py --last-link` prints it for copying to your phone. A selects street/US aerial, then M loads it. T toggles RGB/fallback. H help. Q quits. Letter controls accept upper/lowercase. Terminal minimum: 80x23, Truecolor recommended; common xterm/screen/tmux terminal types try RGB automatically. T toggles the 256-color fallback if your client does not display it correctly. Without 256-color support the map uses grayscale ASCII; names and directions remain text. The fallback uses adaptive colors to fit available terminal color-pair limits. Supersampling is deliberately omitted: enlarging existing raster tiles cannot add detail.
 
 ## Install
 
@@ -41,3 +42,13 @@ V1 is cached-view offline only. It does NOT download a region, provide offline a
 ## Tests and license
 
 Unit tests, actual Photon search/OSM tile/OSRM route checks using public Berlin landmarks, live terminal visual/quit tests on Linux. No Raspberry Pi hardware test yet. Upstream services and road conditions aren't certified by a successful test. MIT app code, copyright 2026 Greenisus1. Provider data retains its own licenses.
+
+## US aerial sources
+
+Map services and data available from U.S. Geological Survey, National Geospatial Program. USDA, USGS The National Map: Orthoimagery. Data refreshed June 2024; source image dates vary and are older than the refresh. No live imagery or worldwide coverage claim. Alaska/Hawaii excluded because imagery rights differ. Bounding area is a service safeguard, not a guarantee that every point has coverage.
+
+Terms: https://www.usgs.gov/faqs/what-are-terms-uselicensing-map-services-and-data-national-map
+Metadata: https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer?f=pjson
+Official service explanation: https://www.usgs.gov/faqs/what-are-urls-imagery-services-national-map-and-are-they-cached-or-dynamic
+
+The service is best-effort. No automated refresh, bulk prefetch or paid fallback. Viewed images cache locally; this is not a downloadable offline region.
