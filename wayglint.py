@@ -3,7 +3,7 @@
 import sys,argparse,curses,hashlib,io,json,math,os,queue,re,threading,time,urllib.parse,urllib.request
 from pathlib import Path
 from PIL import Image
-VERSION='1.0.1'
+VERSION='1.0.2'
 HOME=Path.home()/'.local/share/wayglint'
 UA='Wayglint/1.0 (https://github.com/Greenisus1/wayglint)'
 DEFAULTS={'search':'https://photon.komoot.io/api/','route':'https://routing.openstreetmap.de/routed-car/route/v1/driving/','tiles':'https://tile.openstreetmap.org/{z}/{x}/{y}.png','aerial':'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}'}
@@ -176,7 +176,7 @@ def run(screen,demo=False):
   screen.move(h-2,0);screen.clrtoeol();put(h-2,1,label);screen.refresh()
   try:return screen.getstr(h-2,min(len(label)+2,w-5),max(1,w-len(label)-5)).decode('utf-8','replace')
   finally:screen.nodelay(True);curses.noecho();curses.curs_set(0)
- truecolor=os.environ.get('TERM','').startswith(('xterm','screen','tmux')) or os.environ.get('COLORTERM','').lower() in ('truecolor','24bit');aerial=False;last_ansi=None;true_cache=None;ansi_rows=None;ansi_stamp=None;render_cache=None;events=queue.Queue();busy=False;current={'name':'No place selected','lat':0,'lon':0};z=17;tile=demo_tile() if demo else None;results=[];index=0;origin=None;route=None;scroll=0;view='map';message='S search, or C enter lat,lon. Press M to load the map viewport.';privacy=False
+ truecolor=os.environ.get('TERM','').startswith(('xterm','screen','tmux')) or os.environ.get('COLORTERM','').lower() in ('truecolor','24bit');panel_visible=False;aerial=False;last_ansi=None;true_cache=None;ansi_rows=None;ansi_stamp=None;render_cache=None;events=queue.Queue();busy=False;current={'name':'No place selected','lat':0,'lon':0};z=17;tile=demo_tile() if demo else None;results=[];index=0;origin=None;route=None;scroll=0;view='map';message='S search, or C enter lat,lon. Press M to load the map viewport.';privacy=False
  def background(fn,kind):
   nonlocal busy,message
   if busy:message='Wait for the current request.';return
@@ -196,6 +196,7 @@ def run(screen,demo=False):
  while True:
   h,w=screen.getmaxyx();key=screen.getch()
   if key in (ord('q'),ord('Q')):return
+  if key in (ord('p'),ord('P')):panel_visible=not panel_visible
   if key in (ord('t'),ord('T')):truecolor=not truecolor;message='Truecolor ON' if truecolor else '256-color fallback ON'
   ansi_rows=None
   while not events.empty():
@@ -252,9 +253,15 @@ def run(screen,demo=False):
   height=h-9;width=w-4
   if view=='map' and tile:
    # Map takes left 2/3; right panel keeps important names in readable text.
-   mw=max(40,width-44);mh=min(height-2,max(12,round(mw*.625/2)))
-   signature=(id(tile['image']),mw,mh)
-   if render_cache is None or render_cache[0]!=signature:render_cache=(signature,map_pixels(tile['image'],mw,mh))
+   mw=max(40,width-44) if panel_visible else width
+   mh=min(height-2,max(12,round(mw*.625/2))) if panel_visible else height
+   source=tile['image'];cw=source.width;ch=source.height;ratio=mw/(mh*2)
+   if cw/ch>ratio:cw=round(ch*ratio)
+   else:ch=round(cw/ratio)
+   ox=(source.width-cw)//2;oy=(source.height-ch)//2
+   display=source.crop((ox,oy,ox+cw,oy+ch))
+   signature=(id(tile['image']),mw,mh,panel_visible)
+   if render_cache is None or render_cache[0]!=signature:render_cache=(signature,map_pixels(display,mw,mh))
    pixels=render_cache[1]
    capable=color and curses.COLORS>=256 and curses.COLOR_PAIRS>=60
    pairs={};next_pair=20;max_pair=min(curses.COLOR_PAIRS,32767) if color else 0
@@ -272,34 +279,35 @@ def run(screen,demo=False):
    marks=[]
    if route and 'left' in tile:
     for lon,lat in route.get('geometry',[]):
-     rx,ry=tile_point(lat,lon,tile['z']);mx=(rx*256-tile['left'])/256;my=(ry*256-tile['top'])/160
+     rx,ry=tile_point(lat,lon,tile['z']);mx=(rx*256-tile['left']-ox)/cw;my=(ry*256-tile['top']-oy)/ch
      if 0<=mx<1 and 0<=my<1:
       marks.append((int(mx*mw),int(my*mh),'*'));put(5+int(my*mh),2+int(mx*mw),'*',5)
    if 'left' in tile:
     px,py=tile_point(current['lat'],current['lon'],tile['z'])
-    mx=(px*256-tile['left'])/256;my=(py*256-tile['top'])/160
+    mx=(px*256-tile['left']-ox)/cw;my=(py*256-tile['top']-oy)/ch
     if 0<=mx<1 and 0<=my<1:
      marks.append((int(mx*mw),int(my*mh),'X'));put(5+int(my*mh),2+int(mx*mw),'X',5)
    else:
     marks.append((mw//2,mh//2,'X'));put(5+mh//2,2+mw//2,'X',5)
    if truecolor:
     sig=(signature,tuple(marks))
-    if true_cache is None or true_cache[0]!=sig:true_cache=(sig,truecolor_rows(tile['image'],mw,mh,marks))
+    if true_cache is None or true_cache[0]!=sig:true_cache=(sig,truecolor_rows(display,mw,mh,marks))
     ansi_rows=true_cache[1];ansi_stamp=sig
-   panel=mw+5
-   put(5,panel,'SELECTED PLACE',8)
-   for i,line in enumerate(__import__('textwrap').wrap(current['name'],max(20,width-mw-6))[:6]):put(7+i,panel,line,8)
-   put(15,panel,'X = selected center',8)
-   put(16,panel,'Zoom '+str(z)+' / loaded '+str(tile['z']),8)
-   if h>=30:
-    put(19,panel,'S search  F save  B saved',8)
-    put(21,panel,'O origin  R directions',8)
-   if route and h>=35:
-    put(24,panel,f"Route: {route['distance']/1000:.1f} km",8)
-    put(25,panel,f"Estimate: {route['duration']/60:.0f} min",8)
-    put(27,panel,'Esc map / R route steps',8)
-   put(3,2,('US AERIAL | ' if tile.get('aerial') else 'STREET MAP | ')+('RGB TRUECOLOR' if truecolor else '256-COLOR')+' | A street/aerial | T color mode',8)
-   put(6+mh,2,'Road shapes are visual context, not readable street-label guarantees.',8)
+   if panel_visible:
+    panel=mw+5
+    put(5,panel,'SELECTED PLACE',8)
+    for i,line in enumerate(__import__('textwrap').wrap(current['name'],max(20,width-mw-6))[:6]):put(7+i,panel,line,8)
+    put(15,panel,'X = selected center',8)
+    put(16,panel,'Zoom '+str(z)+' / loaded '+str(tile['z']),8)
+    if h>=30:
+     put(19,panel,'S search  F save  B saved',8)
+     put(21,panel,'O origin  R directions',8)
+    if route and h>=35:
+     put(24,panel,f"Route: {route['distance']/1000:.1f} km",8)
+     put(25,panel,f"Estimate: {route['duration']/60:.0f} min",8)
+     put(27,panel,'Esc map / R route steps',8)
+   put(3,2,('US AERIAL | ' if tile.get('aerial') else 'STREET MAP | ')+('RGB TRUECOLOR' if truecolor else '256-COLOR')+' | A street/aerial | T color | P place panel | X selected center',8)
+   if panel_visible:put(6+mh,2,'Map context only; use text for names.',8)
   elif view=='map':put(5,3,'No map fetched yet. Search or enter coordinates, then M.',4)
   elif view=='search':
    for i,p in enumerate(results):put(5+i*2,3,('> ' if i==index else '  ')+p['name'],7 if i==index else 8)
