@@ -16,7 +16,7 @@ This is a planning/exploration app, not live navigation. No GPS tracking, live t
 
 ## Controls
 
-S search; Up/Down choose and Enter select. C enter latitude,longitude. M fetch map viewport. Arrows pan desired center; +/- zoom. O marks current place as origin; select destination and R requests a driving route. Up/Down scroll steps, Esc returns to map. F saves a favorite; B lists favorites. G saves a Google Maps route link locally; `python3 wayglint.py --last-link` prints it for copying to your phone. A selects street/US aerial, then M loads it. T toggles RGB/fallback. H help. Q quits. Letter controls accept upper/lowercase. Terminal minimum: 80x23, Truecolor recommended; common xterm/screen/tmux terminal types try RGB automatically. T toggles the 256-color fallback if your client does not display it correctly. Without 256-color support the map uses grayscale ASCII; names and directions remain text. The fallback uses adaptive colors to fit available terminal color-pair limits. Supersampling is deliberately omitted: enlarging existing raster tiles cannot add detail.
+S search; Up/Down choose and Enter select. C enter latitude,longitude. M fetch map viewport. Arrows pan desired center; +/- zoom. O marks current place as origin; select destination and R requests a driving route. Up/Down scroll steps, Esc returns to map. F saves a favorite; B lists favorites. G saves a Google Maps route link locally; `python3 wayglint.py --last-link` prints it for copying to your phone. Map fills the usable screen by default; P toggles the selected-place side panel. A selects street/US aerial, then M loads it. T toggles RGB/fallback. H help. Q quits. Letter controls accept upper/lowercase. Terminal minimum: 80x23, Truecolor recommended; common xterm/screen/tmux terminal types try RGB automatically. T toggles the 256-color fallback if your client does not display it correctly. Without 256-color support the map uses grayscale ASCII; names and directions remain text. The fallback uses adaptive colors to fit available terminal color-pair limits. Supersampling is deliberately omitted: enlarging existing raster tiles cannot add detail.
 
 ## Install
 
@@ -52,3 +52,7 @@ Metadata: https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/M
 Official service explanation: https://www.usgs.gov/faqs/what-are-urls-imagery-services-national-map-and-are-they-cached-or-dynamic
 
 The service is best-effort. No automated refresh, bulk prefetch or paid fallback. Viewed images cache locally; this is not a downloadable offline region.
+
+## Full-width view (1.0.2)
+
+The map uses full width and available height by default, keeping title, controls and attribution visible. P restores the place panel. Central cropping preserves image aspect ratio rather than stretching the map; crop can hide the edges of a previously viewed region. No extra network request is made just to toggle the panel.
